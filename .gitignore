@@ -1,0 +1,14 @@
+# Logs
+logs.txt
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Environment (contains personal config)
+.env
