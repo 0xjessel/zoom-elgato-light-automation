@@ -13,8 +13,8 @@
 
     <key>EnvironmentVariables</key>
     <dict>
-        <key>ELGATO_LIGHT_IPS</key>
-        <string>__LIGHT_IPS__</string>
+        <key>ELGATO_LIGHTS</key>
+        <string>__ELGATO_LIGHTS__</string>
     </dict>
 
     <key>RunAtLoad</key>

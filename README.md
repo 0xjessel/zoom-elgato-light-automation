@@ -18,6 +18,7 @@ This macOS daemon monitors camera activation events using the system log stream.
 - **Event-driven**: No polling. Uses macOS `log stream` to detect camera events instantly
 - **Works with any app**: Zoom, Google Meet, FaceTime, Photo Booth, etc.
 - **Multiple lights**: Controls multiple Elgato Key Lights simultaneously
+- **Per-light settings**: Configure brightness and color temperature for each light
 - **Auto-start**: Runs automatically at login via LaunchAgent
 - **Resilient**: Auto-restarts if the process crashes
 - **Zero dependencies**: Uses only Python standard library
@@ -38,20 +39,24 @@ git clone https://github.com/0xjessel/zoom-elgato-light-automation.git
 cd zoom-elgato-light-automation
 ```
 
-### 2. Configure your light IPs
+### 2. Configure your lights
 
 ```bash
 # Copy the example environment file
 cp .env.example .env
 
-# Edit .env with your Elgato Key Light IP addresses
-# Find IPs in Elgato Control Center app under light settings
+# Edit .env with your light settings
 ```
 
 Example `.env`:
 ```bash
-ELGATO_LIGHT_IPS=192.168.1.100,192.168.1.101
+# Format: IP:BRIGHTNESS:TEMPERATURE
+# - Brightness: 0-100 (percentage)
+# - Temperature: 2900-7000 (Kelvin)
+ELGATO_LIGHTS=192.168.1.100:50:4500,192.168.1.101:75:5000
 ```
+
+Find your light IPs in the Elgato Control Center app under light settings.
 
 ### 3. Test the lights
 
@@ -138,8 +143,22 @@ All configuration is done via environment variables in `.env`:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ELGATO_LIGHT_IPS` | Yes | Comma-separated list of light IP addresses |
+| `ELGATO_LIGHTS` | Yes | Comma-separated list of `IP:BRIGHTNESS:TEMPERATURE` |
 | `ELGATO_LIGHT_PORT` | No | Port number (default: 9123) |
+
+**Format**: `IP:BRIGHTNESS:TEMPERATURE`
+- **IP**: Your light's IP address
+- **BRIGHTNESS**: 0-100 (percentage)
+- **TEMPERATURE**: 2900-7000 (Kelvin, warm to cool)
+
+**Examples**:
+```bash
+# Two lights with different settings
+ELGATO_LIGHTS=192.168.1.100:15:4200,192.168.1.101:10:4200
+
+# Just IP (uses defaults: 100% brightness, 5600K)
+ELGATO_LIGHTS=192.168.1.100
+```
 
 ## Limitations
 

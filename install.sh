@@ -29,17 +29,18 @@ else
 fi
 
 # Validate required environment variables
-if [[ -z "$ELGATO_LIGHT_IPS" ]]; then
+if [[ -z "$ELGATO_LIGHTS" ]]; then
     echo ""
-    echo "ERROR: ELGATO_LIGHT_IPS not set in .env"
+    echo "ERROR: ELGATO_LIGHTS not set in .env"
     echo ""
-    echo "Edit .env and add your light IPs, for example:"
-    echo "  ELGATO_LIGHT_IPS=192.168.1.100,192.168.1.101"
+    echo "Edit .env and add your light configuration:"
+    echo "  ELGATO_LIGHTS=192.168.1.100:50:4500,192.168.1.101:75:5000"
     echo ""
+    echo "Format: IP:BRIGHTNESS:TEMPERATURE (comma-separated)"
     exit 1
 fi
 
-echo "  Light IPs: $ELGATO_LIGHT_IPS"
+echo "  Lights: $ELGATO_LIGHTS"
 
 # Find Python path
 PYTHON_PATH=$(which python3)
@@ -55,7 +56,7 @@ LOG_PATH="$HOME/Library/Logs/zoom-elgato-light-automation.log"
 echo "  Generating LaunchAgent plist..."
 sed -e "s|__PYTHON_PATH__|$PYTHON_PATH|g" \
     -e "s|__SCRIPT_PATH__|$SCRIPT_PATH|g" \
-    -e "s|__LIGHT_IPS__|$ELGATO_LIGHT_IPS|g" \
+    -e "s|__ELGATO_LIGHTS__|$ELGATO_LIGHTS|g" \
     -e "s|__LOG_PATH__|$LOG_PATH|g" \
     "$PLIST_TEMPLATE" > "$PLIST_DST"
 

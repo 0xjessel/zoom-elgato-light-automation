@@ -4,7 +4,7 @@ A macOS automation that turns Elgato Key Lights on/off based on camera usage.
 
 ## Project Overview
 
-This Python daemon monitors macOS camera activation events and controls Elgato Key Lights via their HTTP API. When the camera turns on (e.g., joining a Zoom video call), the lights turn on. When the camera turns off, the lights turn off.
+This Python daemon monitors macOS camera activation events and controls Elgato Key Lights via their HTTP API. When the camera turns on (e.g., joining a Zoom video call), the lights turn on with configured brightness/temperature. When the camera turns off, the lights turn off.
 
 ## Key Components
 
@@ -14,11 +14,17 @@ This Python daemon monitors macOS camera activation events and controls Elgato K
 
 ## Configuration
 
-Light IPs are configured via environment variables in `.env`:
+Light settings are configured via environment variables in `.env`:
 
 ```bash
-ELGATO_LIGHT_IPS=192.168.1.100,192.168.1.101
+# Format: IP:BRIGHTNESS:TEMPERATURE
+ELGATO_LIGHTS=192.168.1.100:15:4200,192.168.1.101:10:4200
 ```
+
+- **BRIGHTNESS**: 0-100 (percentage)
+- **TEMPERATURE**: 2900-7000 (Kelvin)
+
+Note: The Elgato API uses "mireds" internally. The script converts Kelvin to mireds automatically.
 
 ## Files
 
