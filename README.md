@@ -202,17 +202,80 @@ ELGATO_LIGHTS=192.168.1.100
 
 | File | Description |
 |------|-------------|
-| `zoom-elgato-light-automation.py` | Main daemon script |
+| `zoom-elgato-light-automation.py` | Main daemon script (Python) |
 | `com.local.zoom-elgato-light.plist.template` | LaunchAgent template |
 | `.env.example` | Example configuration file |
-| `install.sh` | Installation script |
+| `install.sh` | Installation script (Python version) |
 | `uninstall.sh` | Uninstallation script |
 | `test_camera_detection.py` | Test script for camera detection |
 | `test_light_control.py` | Test script for light control |
+| `hammerspoon/elgato-lights.lua` | Hammerspoon module |
+| `hammerspoon/init.lua` | Hammerspoon config example |
 
 ## Future Improvements
 
-- **Hammerspoon integration**: Consider porting this to [Hammerspoon](https://www.hammerspoon.org/) for a more integrated macOS automation experience. Hammerspoon's Lua scripting and built-in event watchers could simplify camera detection and eliminate the need for a separate LaunchAgent.
+- ~~**Hammerspoon integration**: Consider porting this to [Hammerspoon](https://www.hammerspoon.org/) for a more integrated macOS automation experience.~~ ✅ Done! See [Hammerspoon Alternative](#hammerspoon-alternative) below.
+
+## Hammerspoon Alternative
+
+For a cleaner, more integrated solution, you can use [Hammerspoon](https://www.hammerspoon.org/) instead of the Python daemon. Hammerspoon provides native camera monitoring via `hs.camera` and runs automatically at login.
+
+### Benefits
+
+- Native macOS integration via `hs.camera` module
+- No LaunchAgent or separate daemon needed
+- Handles camera add/remove events (useful for external cameras)
+- Silent failures when lights are unreachable (works on the go)
+
+### Installation
+
+1. Install Hammerspoon:
+   ```bash
+   brew install --cask hammerspoon
+   ```
+
+2. Copy the configuration files:
+   ```bash
+   cp hammerspoon/elgato-lights.lua ~/.hammerspoon/
+   cp hammerspoon/init.lua ~/.hammerspoon/
+   ```
+
+   Or if you have an existing `init.lua`, add this line:
+   ```lua
+   require("elgato-lights").start()
+   ```
+
+3. Edit `~/.hammerspoon/elgato-lights.lua` to configure your lights:
+   ```lua
+   local lights = {
+       { ip = "192.168.1.100", brightness = 50, temperature = 4500 },
+       { ip = "192.168.1.101", brightness = 75, temperature = 5000 },
+   }
+   ```
+
+4. Open Hammerspoon and grant Accessibility permissions when prompted.
+
+5. Reload config with `Cmd+Ctrl+R` or click the Hammerspoon menu bar icon → Reload Config.
+
+### Hammerspoon Commands
+
+In Hammerspoon console (click menu bar icon → Console):
+
+```lua
+-- Check status
+require("elgato-lights").status()
+
+-- Manually control lights
+require("elgato-lights").lightsOn()
+require("elgato-lights").lightsOff()
+```
+
+### Uninstalling Python Version
+
+If switching to Hammerspoon, remove the Python daemon:
+```bash
+./uninstall.sh
+```
 
 ## License
 

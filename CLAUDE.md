@@ -4,43 +4,61 @@ A macOS automation that turns Elgato Key Lights on/off based on camera usage.
 
 ## Project Overview
 
-This Python daemon monitors macOS camera activation events and controls Elgato Key Lights via their HTTP API. When the camera turns on (e.g., joining a Zoom video call), the lights turn on with configured brightness/temperature. When the camera turns off, the lights turn off.
+This project provides two implementations for monitoring camera events and controlling Elgato Key Lights:
 
-## Key Components
+1. **Python daemon** - Uses `log stream` to monitor camera events, runs via LaunchAgent
+2. **Hammerspoon module** (recommended) - Native `hs.camera` API, runs within Hammerspoon
 
-- **Camera Detection**: Uses macOS `log stream` to monitor camera activation events (event-driven, not polling)
-- **Light Control**: HTTP API calls to Elgato Key Light endpoints on port 9123
-- **LaunchAgent**: Keeps the daemon running at login and auto-restarts on failure
+When the camera turns on (e.g., joining a Zoom video call), the lights turn on with configured brightness/temperature. When the camera turns off, the lights turn off.
+
+## Implementations
+
+### Hammerspoon (Recommended)
+
+Located in `hammerspoon/` directory. Uses native `hs.camera` module for cleaner integration.
+
+- **elgato-lights.lua**: Main module with camera watching and light control
+- **init.lua**: Example config that loads the module
+
+Key features:
+- Native camera add/remove event handling
+- Silent failures when lights are unreachable (works on the go)
+- No LaunchAgent needed
+
+### Python
+
+Original implementation using `log stream` to parse CoreMediaIO events.
+
+- **zoom-elgato-light-automation.py**: Main daemon script
+- **com.local.zoom-elgato-light.plist.template**: LaunchAgent template
+- **install.sh / uninstall.sh**: Installation scripts
 
 ## Configuration
 
-Light settings are configured via environment variables in `.env`:
+### Hammerspoon
 
-```bash
-# Format: IP:BRIGHTNESS:TEMPERATURE
-ELGATO_LIGHTS=192.168.1.100:15:4200,192.168.1.101:10:4200
+Edit `~/.hammerspoon/elgato-lights.lua`:
+```lua
+local lights = {
+    { ip = "192.168.1.100", brightness = 50, temperature = 4500 },
+    { ip = "192.168.1.101", brightness = 75, temperature = 5000 },
+}
 ```
 
-- **BRIGHTNESS**: 0-100 (percentage)
-- **TEMPERATURE**: 2900-7000 (Kelvin)
+### Python
 
-Note: The Elgato API uses "mireds" internally. The script converts Kelvin to mireds automatically.
+Environment variables in `.env`:
+```bash
+ELGATO_LIGHTS=192.168.1.100:50:4500,192.168.1.101:75:5000
+```
 
-## Files
+## Technical Notes
 
-| File | Purpose |
-|------|---------|
-| `zoom-elgato-light-automation.py` | Main daemon script |
-| `com.local.zoom-elgato-light.plist.template` | LaunchAgent template |
-| `.env.example` | Example configuration |
-| `install.sh` / `uninstall.sh` | Installation scripts |
+- **Elgato API**: HTTP PUT to port 9123, uses "mireds" for temperature
+- **Mireds conversion**: `mireds = 1,000,000 / kelvin`
+- **Valid range**: 143 (7000K) to 344 (2900K)
 
 ## Limitations
 
 - Only activates for video calls (camera must be on)
 - Audio-only calls will NOT trigger the lights
-
-## Dependencies
-
-- Python 3 (standard library only)
-- No pip installs required
