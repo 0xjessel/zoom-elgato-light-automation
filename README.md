@@ -210,6 +210,10 @@ ELGATO_LIGHTS=192.168.1.100
 | `test_camera_detection.py` | Test script for camera detection |
 | `test_light_control.py` | Test script for light control |
 
+## Future Improvements
+
+- **Hammerspoon integration**: Consider porting this to [Hammerspoon](https://www.hammerspoon.org/) for a more integrated macOS automation experience. Hammerspoon's Lua scripting and built-in event watchers could simplify camera detection and eliminate the need for a separate LaunchAgent.
+
 ## License
 
 MIT License - feel free to use, modify, and distribute.
