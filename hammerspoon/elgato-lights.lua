@@ -29,6 +29,7 @@ local HTTP_TIMEOUT = 3  -- seconds
 
 local cameraWatchers = {}  -- table of camera -> watcher
 local anyCameraInUse = false
+local turnOffTimer = nil   -- debounce timer for turning off lights
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -115,14 +116,30 @@ local function onCameraStateChange(camera, property, scope, element)
 
     if nowInUse and not wasInUse then
         -- Transitioned from no cameras in use to at least one in use
+        -- Cancel any pending turn-off timer
+        if turnOffTimer then
+            turnOffTimer:stop()
+            turnOffTimer = nil
+            log.i("Cancelled pending light turn-off")
+        end
         log.i(string.format("Camera activated: %s", camera:name()))
         anyCameraInUse = true
         setAllLights(true)
     elseif not nowInUse and wasInUse then
         -- Transitioned from cameras in use to none in use
-        log.i(string.format("Camera deactivated: %s", camera:name()))
+        -- Use a 1-second delay to avoid flickering from brief camera state changes
+        log.i(string.format("Camera deactivated: %s (waiting 1s before turning off lights)", camera:name()))
         anyCameraInUse = false
-        setAllLights(false)
+        if turnOffTimer then
+            turnOffTimer:stop()
+        end
+        turnOffTimer = hs.timer.doAfter(1, function()
+            -- Double-check no camera is in use before turning off
+            if not checkAnyCameraInUse() then
+                setAllLights(false)
+            end
+            turnOffTimer = nil
+        end)
     end
 end
 
@@ -159,7 +176,16 @@ local function onCameraAddedOrRemoved(camera, event)
         -- Check if we need to turn off lights (in case the removed camera was in use)
         if anyCameraInUse and not checkAnyCameraInUse() then
             anyCameraInUse = false
-            setAllLights(false)
+            -- Use same 1-second delay for consistency
+            if turnOffTimer then
+                turnOffTimer:stop()
+            end
+            turnOffTimer = hs.timer.doAfter(1, function()
+                if not checkAnyCameraInUse() then
+                    setAllLights(false)
+                end
+                turnOffTimer = nil
+            end)
         end
     end
 end
@@ -206,6 +232,12 @@ end
 -- Stop monitoring cameras
 function M.stop()
     log.i("Stopping Elgato Light Automation")
+
+    -- Cancel any pending turn-off timer
+    if turnOffTimer then
+        turnOffTimer:stop()
+        turnOffTimer = nil
+    end
 
     hs.camera.stopWatcher()
 
