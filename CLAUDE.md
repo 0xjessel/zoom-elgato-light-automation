@@ -69,3 +69,4 @@ After completing any feature or bug fix to Hammerspoon files:
 
 1. **Commit and push** the changes to GitHub
 2. **Copy** `hammerspoon/elgato-lights.lua` to `~/.hammerspoon/elgato-lights.lua` so changes take effect locally
+3. Remind the user to reload Hammerspoon config (Cmd+Ctrl+R)
