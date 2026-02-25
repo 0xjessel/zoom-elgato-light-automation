@@ -13,9 +13,20 @@ local log = hs.logger.new("elgato", "info")
 -- Configuration
 --------------------------------------------------------------------------------
 
--- Light settings: IP, brightness (0-100), temperature (Kelvin 2900-7000)
--- TODO: Update these with your Elgato Key Light IP addresses
-local lights = {
+-- Try to load local config from ~/.hammerspoon/elgato-config.lua
+local config = {}
+local configPath = hs.configdir .. "/elgato-config.lua"
+local ok, result = pcall(dofile, configPath)
+if ok and result then
+    config = result
+    log.i("Loaded config from " .. configPath)
+else
+    log.i("No local config found at " .. configPath .. ", using defaults")
+end
+
+-- Light settings from config or defaults
+-- Each light: IP, brightness (0-100), temperature (Kelvin 2900-7000)
+local lights = config.lights or {
     { ip = "192.168.1.100", brightness = 50, temperature = 4500 },
     { ip = "192.168.1.101", brightness = 75, temperature = 5000 },
 }
@@ -30,6 +41,7 @@ local HTTP_TIMEOUT = 3  -- seconds
 local cameraWatchers = {}  -- table of camera -> watcher
 local anyCameraInUse = false
 local turnOffTimer = nil   -- debounce timer for turning off lights
+local caffeinateWatcher = nil  -- system sleep/wake watcher
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -48,6 +60,7 @@ end
 
 -- Set a single light on or off
 local function setLight(light, on)
+    log.i(string.format("HTTP: Sending %s request to %s", on and "ON" or "OFF", light.ip))
     local url = string.format("http://%s:%d/elgato/lights", light.ip, PORT)
     local payload
 
@@ -77,7 +90,7 @@ local function setLight(light, on)
             end
         elseif code == 0 then
             -- Connection failed - light is unreachable (probably not at home)
-            log.d(string.format("Light %s: unreachable (not on network)", light.ip))
+            log.i(string.format("Light %s: unreachable (code=0, network error)", light.ip))
         else
             log.w(string.format("Light %s: failed with code %d", light.ip, code))
         end
@@ -114,6 +127,11 @@ local function onCameraStateChange(camera, property, scope, element)
     local wasInUse = anyCameraInUse
     local nowInUse = checkAnyCameraInUse()
 
+    -- Diagnostic logging
+    log.i(string.format("Camera event: %s (property=%s)", camera:name(), tostring(property)))
+    log.i(string.format("  State: wasInUse=%s, nowInUse=%s, anyCameraInUse=%s",
+        tostring(wasInUse), tostring(nowInUse), tostring(anyCameraInUse)))
+
     if nowInUse and not wasInUse then
         -- Transitioned from no cameras in use to at least one in use
         -- Cancel any pending turn-off timer
@@ -123,12 +141,14 @@ local function onCameraStateChange(camera, property, scope, element)
             log.i("Cancelled pending light turn-off")
         end
         log.i(string.format("Camera activated: %s", camera:name()))
+        log.i("  -> Triggering lights ON")
         anyCameraInUse = true
         setAllLights(true)
     elseif not nowInUse and wasInUse then
         -- Transitioned from cameras in use to none in use
         -- Use a 1-second delay to avoid flickering from brief camera state changes
         log.i(string.format("Camera deactivated: %s (waiting 1s before turning off lights)", camera:name()))
+        log.i("  -> Triggering lights OFF (with 1s debounce)")
         anyCameraInUse = false
         if turnOffTimer then
             turnOffTimer:stop()
@@ -140,18 +160,25 @@ local function onCameraStateChange(camera, property, scope, element)
             end
             turnOffTimer = nil
         end)
+    else
+        log.i("  -> No state change, skipping light control")
     end
 end
 
 -- Set up watcher for a single camera
 local function watchCamera(camera)
-    if cameraWatchers[camera:uid()] then
-        return  -- Already watching this camera
+    local uid = camera:uid()
+    local existing = cameraWatchers[uid]
+
+    if existing then
+        log.i(string.format("Replacing stale watcher for camera: %s", camera:name()))
+        pcall(function() existing:stopPropertyWatcher() end)
+        cameraWatchers[uid] = nil
     end
 
     camera:setPropertyWatcherCallback(onCameraStateChange)
     camera:startPropertyWatcher()
-    cameraWatchers[camera:uid()] = camera
+    cameraWatchers[uid] = camera
     log.i(string.format("Watching camera: %s", camera:name()))
 end
 
@@ -191,6 +218,59 @@ local function onCameraAddedOrRemoved(camera, event)
 end
 
 --------------------------------------------------------------------------------
+-- Sleep/Wake Handling
+--------------------------------------------------------------------------------
+
+-- Tear down all watchers and rebuild from scratch
+local function reinitializeCameraWatchers()
+    log.i("Reinitializing all camera watchers")
+
+    -- Stop all existing property watchers
+    for uid, camera in pairs(cameraWatchers) do
+        pcall(function() camera:stopPropertyWatcher() end)
+    end
+    cameraWatchers = {}
+
+    -- Re-watch all current cameras
+    local cameras = hs.camera.allCameras()
+    log.i(string.format("Found %d cameras after reinit", #cameras))
+    for _, camera in ipairs(cameras) do
+        watchCamera(camera)
+    end
+
+    -- Reconcile light state
+    local nowInUse = checkAnyCameraInUse()
+    if nowInUse and not anyCameraInUse then
+        log.i("Camera in use after reinit - turning lights on")
+        anyCameraInUse = true
+        setAllLights(true)
+    elseif not nowInUse and anyCameraInUse then
+        log.i("No camera in use after reinit - turning lights off")
+        anyCameraInUse = false
+        setAllLights(false)
+    end
+end
+
+-- Handle system sleep/wake events
+local function onCaffeinateEvent(event)
+    local eventNames = {
+        [hs.caffeinate.watcher.systemDidWake] = "systemDidWake",
+        [hs.caffeinate.watcher.systemWillSleep] = "systemWillSleep",
+        [hs.caffeinate.watcher.systemWillPowerOff] = "systemWillPowerOff",
+        [hs.caffeinate.watcher.screensDidSleep] = "screensDidSleep",
+        [hs.caffeinate.watcher.screensDidWake] = "screensDidWake",
+        [hs.caffeinate.watcher.screensDidLock] = "screensDidLock",
+        [hs.caffeinate.watcher.screensDidUnlock] = "screensDidUnlock",
+    }
+    log.i(string.format("Caffeinate event: %s", eventNames[event] or tostring(event)))
+
+    if event == hs.caffeinate.watcher.systemDidWake then
+        log.i("Reinitializing camera watchers in 2s")
+        hs.timer.doAfter(2, reinitializeCameraWatchers)
+    end
+end
+
+--------------------------------------------------------------------------------
 -- Public API
 --------------------------------------------------------------------------------
 
@@ -204,6 +284,10 @@ function M.start()
             light.ip, light.brightness, light.temperature))
     end
     log.i("=================================================")
+
+    -- Watch for system sleep/wake events
+    caffeinateWatcher = hs.caffeinate.watcher.new(onCaffeinateEvent)
+    caffeinateWatcher:start()
 
     -- Watch for camera add/remove events
     hs.camera.setWatcherCallback(onCameraAddedOrRemoved)
@@ -237,6 +321,12 @@ function M.stop()
     if turnOffTimer then
         turnOffTimer:stop()
         turnOffTimer = nil
+    end
+
+    -- Stop sleep/wake watcher
+    if caffeinateWatcher then
+        caffeinateWatcher:stop()
+        caffeinateWatcher = nil
     end
 
     hs.camera.stopWatcher()

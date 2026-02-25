@@ -62,3 +62,10 @@ ELGATO_LIGHTS=192.168.1.100:50:4500,192.168.1.101:75:5000
 
 - Only activates for video calls (camera must be on)
 - Audio-only calls will NOT trigger the lights
+
+## Workflow
+
+After completing any feature or bug fix to Hammerspoon files:
+
+1. **Commit and push** the changes to GitHub
+2. **Copy** `hammerspoon/elgato-lights.lua` to `~/.hammerspoon/elgato-lights.lua` so changes take effect locally
